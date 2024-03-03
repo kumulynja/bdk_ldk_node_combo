@@ -1,25 +1,60 @@
 import 'dart:io';
 
-import 'package:flutter/material.dart';
 import 'package:bdk_flutter/bdk_flutter.dart';
+import 'package:flutter/material.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:ldk_node/ldk_node.dart' as ldk_node;
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   print('Creating Blockchain');
   await Blockchain.create(
-    config: BlockchainConfig.esplora(
+    config: const BlockchainConfig.esplora(
       config: EsploraConfig(
-        baseUrl: Platform.isAndroid
-            ?
-            //10.0.2.2 to access the AVD
-            'http://10.0.2.2:3002'
-            : 'http://127.0.0.1:3002',
+        baseUrl: "ssl://electrum.blockstream.info:60002",
         stopGap: 10,
       ),
     ),
   );
   print('Blockchain created');
+
+  print('Building lightning node...');
+  final directory = await getApplicationDocumentsDirectory();
+  final nodePath = "${directory.path}/ldk_cache6/";
+  //final mnemonic = await ldk_node.Mnemonic.generate();
+  //print('Mnemonic: ${mnemonic.seedPhrase}');
+  print('Creating builder');
+  final builder = ldk_node.Builder()
+      .setStorageDirPath(nodePath)
+      .setEntropyBip39Mnemonic(
+        mnemonic: ldk_node.Mnemonic(
+            'cart super leaf clinic pistol plug replace close super tooth wealth usage'),
+      )
+      .setEsploraServer(
+        "ssl://electrum.blockstream.info:60002",
+      )
+      .setNetwork(ldk_node.Network.Testnet)
+      .setListeningAddresses(
+    [
+      const ldk_node.SocketAddress.hostname(addr: "0.0.0.0", port: 3434),
+    ],
+  );
+  print('Builder created');
+
+  final ldk_node.Node node;
+
+  try {
+    node = await builder.build();
+  } catch (e) {
+    print('Error building node: $e');
+    return;
+  }
+  print('Node built');
+  await node.start();
+  print('Node started');
+  await node.syncWallets();
+  print('Wallets synced');
 
   runApp(const MyApp());
 }
